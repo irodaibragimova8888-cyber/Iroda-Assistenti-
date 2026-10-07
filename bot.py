@@ -21,18 +21,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-XAI_API_KEY = os.environ["XAI_API_KEY"]
-GROK_MODEL = os.environ.get("GROK_MODEL", "grok-4")
+AI_API_KEY = os.environ["AI_API_KEY"]
+AI_BASE_URL = os.environ.get("AI_BASE_URL", "https://api.groq.com/openai/v1")
+AI_MODEL = os.environ.get("AI_MODEL", "llama-3.3-70b-versatile")
 SYSTEM_PROMPT = os.environ.get(
     "SYSTEM_PROMPT",
     "Sen foydali yordamchisan. Foydalanuvchi qaysi tilda yozsa, shu tilda javob ber.",
 )
-MAX_HISTORY = 10  # oxirgi nechta xabar eslab qolinadi
+MAX_HISTORY = 10
 
-client = AsyncOpenAI(api_key=XAI_API_KEY, base_url="https://api.x.ai/v1")
+client = AsyncOpenAI(api_key=AI_API_KEY, base_url=AI_BASE_URL)
 
 
-# ---------- Render uchun oddiy "health" server ----------
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -48,11 +48,9 @@ def run_health_server():
     HTTPServer(("0.0.0.0", port), HealthHandler).serve_forever()
 
 
-# ---------- Telegram handlerlar ----------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Salom! Men Grok AI bilan ishlaydigan botman. Savolingizni yozing.\n"
-        "Suhbatni tozalash uchun: /reset"
+        "Salom! Savolingizni yozing.\nSuhbatni tozalash uchun: /reset"
     )
 
 
@@ -71,19 +69,18 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         response = await client.chat.completions.create(
-            model=GROK_MODEL,
+            model=AI_MODEL,
             messages=[{"role": "system", "content": SYSTEM_PROMPT}] + history,
         )
         answer = response.choices[0].message.content or "Javob bo'sh keldi."
     except Exception as e:
-        logger.error("Grok xatosi: %s", e)
+        logger.error("AI xatosi: %s", e)
         await update.message.reply_text("Xatolik yuz berdi. Keyinroq qayta urinib ko'ring.")
         history.pop()
         return
 
     history.append({"role": "assistant", "content": answer})
 
-    # Telegram limiti 4096 belgi
     for i in range(0, len(answer), 4000):
         await update.message.reply_text(answer[i : i + 4000])
 
